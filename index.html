@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCP Node.js Socket.io + Redis Deployment Master Guide</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-body: #050505;
+            --bg-card: rgba(20, 20, 20, 0.6);
+            --bg-input: #0a0a0a;
+            --bg-cmd: #000000;
+            --bg-cmd-header: #111111;
+            --border-color: #2a2a2a;
+            --border-glow: rgba(0, 242, 254, 0.3);
+            --text-main: #ededed;
+            --text-muted: #a1a1aa;
+            --accent-gradient: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            --accent-cyan: #00f2fe;
+            --accent-green: #10b981;
+            --accent-purple: #8b5cf6;
+            --accent-orange: #f59e0b;
+            --font-code: 'JetBrains Mono', monospace;
+            --font-text: 'Inter', 'Padauk', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            background-color: var(--bg-body);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(0, 242, 254, 0.04) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.04) 0%, transparent 50%);
+            color: var(--text-main);
+            font-family: var(--font-text);
+            line-height: 1.8;
+            padding-bottom: 100px;
+        }
+
+        header {
+            text-align: center;
+            padding: 4.5rem 1rem 3.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(10, 10, 10, 0.5);
+            backdrop-filter: blur(12px);
+            margin-bottom: 3rem;
+        }
+
+        .logo-icon {
+            font-size: 3.2rem;
+            margin-bottom: 15px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 20px rgba(0, 242, 254, 0.4));
+        }
+
+        header h1 { 
+            font-size: 2.1rem; 
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #ffffff;
+        }
+        
+        header p { 
+            color: var(--text-muted); 
+            font-size: 1rem; 
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .page-wrapper {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .config-panel {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .config-panel h3 {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .config-panel h3 i { color: var(--accent-cyan); }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 18px;
+            margin-top: 15px;
+        }
+        .input-group { display: flex; flex-direction: column; }
+        .input-group label {
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .input-group input {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--accent-cyan);
+            font-family: var(--font-code);
+            padding: 10px 14px;
+            font-size: 0.88rem;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .input-group input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 1px var(--accent-cyan);
+        }
+
+        .section {
+            margin-bottom: 3.5rem;
+        }
+
+        .section-header {
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .section-header h2 {
+            font-size: 1.3rem;
+            color: #ffffff;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .step-list { list-style: none; margin-bottom: 20px; }
+        .step-list li {
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            padding-left: 20px;
+            position: relative;
+            font-size: 0.95rem;
+        }
+        .step-list li::before {
+            content: '▹';
+            position: absolute;
+            left: 0;
+            color: var(--accent-cyan);
+            font-weight: bold;
+        }
+
+        .cmd-box {
+            background: var(--bg-cmd);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .cmd-box-header {
+            background: var(--bg-cmd-header);
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+        
+        .window-controls { display: flex; gap: 7px; align-items: center; }
+        .dot { width: 11px; height: 11px; border-radius: 50%; }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .cmd-title {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-family: var(--font-code);
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .btn-copy-all {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-main);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-copy-all:hover {
+            background: var(--accent-cyan);
+            color: #000;
+            border-color: var(--accent-cyan);
+        }
+
+        .cmd-list { display: flex; flex-direction: column; }
+        .cmd-item {
+            display: flex;
+            align-items: stretch;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+        .cmd-item:last-child { border-bottom: none; }
+        .cmd-item:hover { background: rgba(255,255,255,0.02); }
+        
+        .cmd-code {
+            flex-grow: 1;
+            padding: 14px 18px;
+            font-family: var(--font-code);
+            font-size: 0.88rem;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.6;
+        }
+        
+        .btn-copy-line {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            width: 48px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            opacity: 0;
+        }
+        
+        .cmd-item:hover .btn-copy-line { opacity: 1; }
+        .btn-copy-line:hover { color: var(--accent-cyan); background: rgba(255,255,255,0.05); }
+        .copied { color: var(--accent-green) !important; font-weight: bold; opacity: 1 !important; }
+
+        .dyn-var { 
+            color: var(--accent-orange); 
+            font-weight: 600; 
+        }
+
+        .badge-step {
+            background: var(--accent-gradient);
+            color: #000;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-right: 6px;
+        }
+
+        .tip-box {
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            margin-top: 10px;
+            background: rgba(0, 242, 254, 0.05);
+            border-left: 3px solid var(--accent-cyan);
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .cmd-title { display: none; }
+            .btn-copy-line { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-icon"><i class="fab fa-docker"></i> <i class="fab fa-node-js"></i></div>
+        <h1>GCP Fastify + Redis + Socket.io Master Guide</h1>
+        <p>Ubuntu 24.04 &bull; Docker Compose &bull; Nginx Reverse Proxy &bull; Certbot SSL</p>
+    </header>
+
+    <div class="page-wrapper">
+        
+        <div class="config-panel">
+            <h3><i class="fas fa-sliders-h"></i> Auto Configuration Generator</h3>
+            <p style="font-size:0.88rem; color: var(--text-muted);">အောက်ပါအချက်အလက်များကို ဖြည့်စွက်သည်နှင့် Command များအားလုံးတွင် Auto ပြောင်းလဲသွားပါမည်။</p>
+            
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>VPS Static IP</label>
+                    <input type="text" id="inp-ip" value="192.168.1.1" placeholder="e.g. 192.168.1.1">
+                </div>
+                <div class="input-group">
+                    <label>SSH Username</label>
+                    <input type="text" id="inp-user" value="thuaung.official" placeholder="e.g. thuaung.official">
+                </div>
+                <div class="input-group">
+                    <label>Domain Name</label>
+                    <input type="text" id="inp-domain" value="chat.yourdomain.com" placeholder="e.g. chat.example.com">
+                </div>
+                <div class="input-group">
+                    <label>GitHub SSH Repo Link</label>
+                    <input type="text" id="inp-git" value="git@github.com:tyour_gihub_ssh_linl.git" placeholder="git@github.com:...">
+                </div>
+                <div class="input-group">
+                    <label>Project Folder Name</label>
+                    <input type="text" id="inp-folder" value="2d-chat-backend" placeholder="e.g. 2d-chat-backend">
+                </div>
+                <div class="input-group">
+                    <label>Backend Port</label>
+                    <input type="text" id="inp-port" value="3000" placeholder="e.g. 3000">
+                </div>
+            </div>
+        </div>
+
+        <main>
+            <!-- Step 1 -->
+            <div class="section">
+                <div class="section-header">
+                    <h2><span class="badge-step">၁</span> Local PC မှ Server ထဲသို့ SSH Login ဝင်ရောက်ခြင်း</h2>
+                </div>
+                <ul class="step-list">
+                    <li>SSH Key အမျိုးအစားပေါ်မူတည်၍ Local Terminal (Ubuntu/Mac/WSL) တွင် အောက်ပါအတိုင်း ဝင်ရောက်ပါ။</li>
+                </ul>
+
+                <div class="cmd-box">
+                    <div class="cmd-box-header">
+                        <div class="window-controls"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+                        <span class="cmd-title">local - ssh connect</span>
+                        <button class="btn-copy-all" onclick="copyGroup(this)"><i class="fas fa-copy"></i> Copy All</button>
+                    </div>
+                    <div class="cmd-list">
+                        <div class="cmd-item">
+                            <code class="cmd-code">ssh -i ~/.ssh/id_ed25519 <span class="dyn-var var-user">thuaung.official</span>@<span class="dyn-var var-ip">192.168.1.1</span></code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="section">
+                <div class="section-header">
+                    <h2><span class="badge-step">၂</span> Package Update ပြုလုပ်ခြင်းနှင့် Docker Engine သွင်းယူခြင်း</h2>
+                </div>
+                <ul class="step-list">
+                    <li>Server ထဲသို့ ရောက်ရှိပါက Docker တရားဝင် Script ကို ရယူပြီး Install ပြုလုပ်ပါမည်။</li>
+                </ul>
+
+                <div class="cmd-box">
+                    <div class="cmd-box-header">
+                        <div class="window-controls"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+                        <span class="cmd-title">bash - docker setup</span>
+                        <button class="btn-copy-all" onclick="copyGroup(this)"><i class="fas fa-copy"></i> Copy All</button>
+                    </div>
+                    <div class="cmd-list">
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo apt update && sudo apt install -y curl git ufw</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo usermod -aG docker $USER</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="section">
+                <div class="section-header">
+                    <h2><span class="badge-step">၃</span> GitHub Deploy Key ဖန်တီးပြီး Repo Clone လုပ်ခြင်း</h2>
+                </div>
+                <ul class="step-list">
+                    <li>Server ပေါ်တွင် Deploy Key ဆောက်ပြီး Public Key အား GitHub Repo > <strong>Settings > Deploy keys</strong> ထဲတွင် ထည့်သွင်းပါ။</li>
+                </ul>
+
+                <div class="cmd-box">
+                    <div class="cmd-box-header">
+                        <div class="window-controls"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+                        <span class="cmd-title">bash - server ssh key</span>
+                        <button class="btn-copy-all" onclick="copyGroup(this)"><i class="fas fa-copy"></i> Copy All</button>
+                    </div>
+                    <div class="cmd-list">
+                        <div class="cmd-item">
+                            <code class="cmd-code">ssh-keygen -t ed25519 -C "vps-server" -f ~/.ssh/id_ed25519 -N ""</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">cat ~/.ssh/id_ed25519.pub</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">git clone <span class="dyn-var var-git">git@github.com:tyour_gihub_ssh_linl.git</span></code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="section">
+                <div class="section-header">
+                    <h2><span class="badge-step">၄</span> Environment (.env) ပြင်ဆင်ခြင်းနှင့် Docker Container Run ခြင်း</h2>
+                </div>
+                <ul class="step-list">
+                    <li>Redis Host အား Docker အတွင်းရှိ `redis` Container Name သို့ အလိုအလျောက် ညွှန်းဆိုပေးပြီး Build လုပ်ပါမည်။</li>
+                </ul>
+
+                <div class="cmd-box">
+                    <div class="cmd-box-header">
+                        <div class="window-controls"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+                        <span class="cmd-title">bash - deploy containers</span>
+                        <button class="btn-copy-all" onclick="copyGroup(this)"><i class="fas fa-copy"></i> Copy All</button>
+                    </div>
+                    <div class="cmd-list">
+                        <div class="cmd-item">
+                            <code class="cmd-code">cd ~/<span class="dyn-var var-folder">2d-chat-backend</span> && cp .env.example .env</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">sed -i 's/REDIS_HOST=127.0.0.1/REDIS_HOST=redis/' .env</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo docker compose up -d --build</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo docker compose ps</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="section">
+                <div class="section-header">
+                    <h2><span class="badge-step">၅</span> Nginx Reverse Proxy (WebSocket Support) ရေးဆွဲခြင်း</h2>
+                </div>
+                <ul class="step-list">
+                    <li>Nginx ကို Install ပြုလုပ်ပြီး Socket.io/WebSocket Headers အပြည့်အစုံပါဝင်သော Config ကို တိုက်ရိုက် ရေးသွင်းပါမည်။</li>
+                </ul>
+
+                <div class="cmd-box">
+                    <div class="cmd-box-header">
+                        <div class="window-controls"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+                        <span class="cmd-title">bash - install nginx & write config</span>
+                        <button class="btn-copy-all" onclick="copyGroup(this)"><i class="fas fa-copy"></i> Copy All</button>
+                    </div>
+                    <div class="cmd-list">
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo apt install -y nginx certbot python3-certbot-nginx</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+<code class="cmd-code">sudo bash -c 'cat << "EOF" > /etc/nginx/sites-available/<span class="dyn-var var-domain">chat.yourdomain.com</span>
+upstream chat_backend {
+    server 127.0.0.1:<span class="dyn-var var-port">3000</span>;
+    keepalive 64;
+}
+
+server {
+    listen 80;
+    server_name <span class="dyn-var var-domain">chat.yourdomain.com</span>;
+
+    location /socket.io/ {
+        proxy_pass http://chat_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+
+    location / {
+        proxy_pass http://chat_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+EOF'</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo ln -sf /etc/nginx/sites-available/<span class="dyn-var var-domain">chat.yourdomain.com</span> /etc/nginx/sites-enabled/</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo nginx -t && sudo systemctl reload nginx</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 6 -->
+            <div class="section">
+                <div class="section-header">
+                    <h2><span class="badge-step">၆</span> UFW Firewall နှင့် Free Let's Encrypt SSL (WSS/HTTPS)</h2>
+                </div>
+                <ul class="step-list">
+                    <li>Cloudflare တွင် Domain ကို <strong>DNS only (Grey Cloud)</strong> ထားရှိပြီးနောက် SSL ရယူပါမည်။</li>
+                </ul>
+
+                <div class="cmd-box">
+                    <div class="cmd-box-header">
+                        <div class="window-controls"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+                        <span class="cmd-title">bash - firewall & certbot</span>
+                        <button class="btn-copy-all" onclick="copyGroup(this)"><i class="fas fa-copy"></i> Copy All</button>
+                    </div>
+                    <div class="cmd-list">
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo ufw allow OpenSSH && sudo ufw allow 'Nginx Full' && sudo ufw --force enable</code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                        <div class="cmd-item">
+                            <code class="cmd-code">sudo certbot --nginx -d <span class="dyn-var var-domain">chat.yourdomain.com</span></code>
+                            <button class="btn-copy-line" onclick="copyLine(this)"><i class="far fa-clone"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="tip-box">
+                    <i class="fas fa-check-circle" style="color: var(--accent-green);"></i> SSL ရရှိပြီးပါက Browser မှ <code>https://<span class="dyn-var var-domain">chat.yourdomain.com</span>/health</code> သို့ သွားရောက်စစ်ဆေးနိုင်ပါသည်။
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const inputs = {
+            ip: document.getElementById('inp-ip'),
+            user: document.getElementById('inp-user'),
+            domain: document.getElementById('inp-domain'),
+            git: document.getElementById('inp-git'),
+            folder: document.getElementById('inp-folder'),
+            port: document.getElementById('inp-port')
+        };
+
+        function updateVariables() {
+            const vals = {
+                ip: inputs.ip.value || '192.168.1.1',
+                user: inputs.user.value || 'thuaung.official',
+                domain: inputs.domain.value || 'chat.yourdomain.com',
+                git: inputs.git.value || 'git@github.com:tyour_gihub_ssh_linl.git',
+                folder: inputs.folder.value || '2d-chat-backend',
+                port: inputs.port.value || '3000'
+            };
+
+            for (const [key, val] of Object.entries(vals)) {
+                document.querySelectorAll(`.var-${key}`).forEach(el => {
+                    if (el.textContent !== val) {
+                        el.textContent = val;
+                    }
+                });
+            }
+        }
+
+        updateVariables();
+        Object.values(inputs).forEach(inp => inp.addEventListener('input', updateVariables));
+
+        function writeToClipboard(text, btn, originalIconHtml) {
+            navigator.clipboard.writeText(text).then(() => {
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = originalIconHtml;
+                    btn.classList.remove('copied');
+                }, 1500);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        }
+
+        function copyLine(btn) {
+            const codeEl = btn.previousElementSibling; 
+            if (codeEl) {
+                writeToClipboard(codeEl.innerText.trim(), btn, '<i class="far fa-clone"></i>');
+            }
+        }
+
+        function copyGroup(btn) {
+            const box = btn.closest('.cmd-box');
+            if (box) {
+                const codes = box.querySelectorAll('.cmd-code');
+                let combinedText = Array.from(codes)
+                    .map(el => el.innerText.trim())
+                    .filter(text => text.length > 0)
+                    .join('\n'); 
+                writeToClipboard(combinedText, btn, '<i class="fas fa-copy"></i> Copy All');
+            }
+        }
+    </script>
+</body>
+</html>
